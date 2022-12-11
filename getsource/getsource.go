@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/is-hoku/go-pl0dash/table"
+	"github.com/is-hoku/pl0dash-go/table"
 )
 
 const MAXLINE int = 120           // 1 行の最大文字数

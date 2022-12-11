@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/is-hoku/go-pl0dash/compile"
-	"github.com/is-hoku/go-pl0dash/getsource"
+	"github.com/is-hoku/pl0dash-go/compile"
+	"github.com/is-hoku/pl0dash-go/getsource"
 )
 
 func main() {

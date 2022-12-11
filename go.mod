@@ -1,3 +1,3 @@
-module github.com/is-hoku/go-pl0dash
+module github.com/is-hoku/pl0dash-go
 
 go 1.19
