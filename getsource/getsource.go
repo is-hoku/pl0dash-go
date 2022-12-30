@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/is-hoku/pl0dash-go/table"
 )
@@ -17,18 +18,18 @@ const INSERT_C string = "#0000FF" // 挿入文字の色
 const DELETE_C string = "#FF0000" // 削除文字の色
 const TYPE_C string = "#00FF00"   // タイプエラー文字の色
 
-var fpi *os.File           // ソースファイル
-var scanner *bufio.Scanner // ファイルを 1 行ずつ読むスキャナ
-var fptex *os.File         // LaTex 出力ファイル
-var line [MAXLINE]byte     // 1 行分の入力バッファ
-var lineIndex int          // 次に読む文字の位置
-var ch byte                // 最後に読んだ文字
-var cToken Token           // 最後に読んだトークン
-var idKind table.KindT     // 現トークンの種類
-var spaces int             // そのトークンの前のスペースの個数
-var cr int                 // その前の CR の個数
-var printed bool           // トークンは印字済みか
-var errorNo int = 0        // 出力したエラーの数
+// var fpi *os.File           // ソースファイル
+// var scanner *bufio.Scanner // ファイルを 1 行ずつ読むスキャナ
+// var fptex *os.File     // LaTex 出力ファイル
+var line [MAXLINE]byte // 1 行分の入力バッファ
+var lineIndex int      // 次に読む文字の位置
+var ch byte            // 最後に読んだ文字
+var cToken Token       // 最後に読んだトークン
+var idKind table.KindT // 現トークンの種類
+var spaces int         // そのトークンの前のスペースの個数
+var cr int             // その前の CR の個数
+var printed bool       // トークンは印字済みか
+var errorNo int = 0    // 出力したエラーの数
 
 type KeyID int // キーの文字の種類
 
@@ -75,8 +76,8 @@ const (
 )
 
 type IDVal struct {
-	id    [MAXNAME]byte
-	value int
+	ID    [MAXNAME]byte
+	Value int
 }
 
 type Token struct {
@@ -170,21 +171,21 @@ func initCharClassT() {
 	charClassT[':'] = Colon
 }
 
-func OpenSource(fileName string) (*os.File, *os.File, error) {
+func OpenSource(fileName string) (*os.File, *os.File, *bufio.Scanner, error) {
 	fpi, err := os.Open(fileName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	texFileName := fileName + ".tex"
-	fptex, err = os.Create(texFileName)
+	fptex, err := os.Create(texFileName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	scanner = bufio.NewScanner(fpi)
-	return fpi, fptex, nil
+	scanner := bufio.NewScanner(fpi)
+	return fpi, fptex, scanner, nil
 }
 
-func InitSource() {
+func InitSource(fptex *os.File) {
 	lineIndex = -1
 	ch = '\n'
 	printed = false
@@ -197,17 +198,17 @@ func InitSource() {
 	fptex.WriteString("\\rm\n")
 }
 
-func FinalSource() {
+func FinalSource(fptex *os.File) {
 	if cToken.Kind == Period {
-		printcToken()
+		printcToken(fptex)
 	} else {
-		ErrorInsert(Period)
+		ErrorInsert(Period, fptex)
 	}
 	fptex.WriteString("\n\\end{document}\n")
 }
 
 // エラーが多いと終了 (panic)
-func errorNocheck() {
+func errorNocheck(fptex *os.File) {
 	errorNo++
 	if errorNo > MAXERROR {
 		fptex.WriteString("too many errors\n\\end{document}\n")
@@ -216,61 +217,61 @@ func errorNocheck() {
 }
 
 // 型エラーを .tex ファイルに出力
-func ErrorType(m string) {
-	printSpaces()
+func ErrorType(m string, fptex *os.File) {
+	printSpaces(fptex)
 	fptex.WriteString(fmt.Sprintf("\\(\\stackrel{\\mbox{\\scriptsize %s}}{\\mbox{", m))
-	printcToken()
+	printcToken(fptex)
 	fptex.WriteString("}}\\)")
-	errorNocheck()
+	errorNocheck(fptex)
 }
 
 // keyString(k) を .tex ファイルに挿入
-func ErrorInsert(k KeyID) {
+func ErrorInsert(k KeyID, fptex *os.File) {
 	if k < End_of_KeyWd { // 予約語
 		fptex.WriteString(fmt.Sprintf("\\ \\insert{{\\bf %s}}", keyWdT[k].word))
 	} else { // 演算子か区切り記号
 		fptex.WriteString(fmt.Sprintf("\\ \\insert{$%s$}", keyWdT[k].word))
 	}
-	errorNocheck()
+	errorNocheck(fptex)
 }
 
 // 名前が無いとのメッセージを .tex ファイルに挿入
-func ErrorMissingID() {
+func ErrorMissingID(fptex *os.File) {
 	fptex.WriteString("\\insert{Id}")
-	errorNocheck()
+	errorNocheck(fptex)
 }
 
 // 演算子が無いとのメッセージを .tex ファイルに挿入
-func ErrorMissingOp() {
+func ErrorMissingOp(fptex *os.File) {
 	fptex.WriteString("\\insert{$\\otimes$}")
-	errorNocheck()
+	errorNocheck(fptex)
 }
 
 // 今読んだトークンを読み捨てる
-func ErrorDelete() {
+func ErrorDelete(fptex *os.File) {
 	i := cToken.Kind
-	printSpaces()
+	printSpaces(fptex)
 	printed = true
 	if i < End_of_KeyWd { // 予約語
 		fptex.WriteString(fmt.Sprintf("\\delete{{\\bf %s}}", keyWdT[i].word))
 	} else if i < End_of_KeySym { // 演算子か区切り記号
 		fptex.WriteString(fmt.Sprintf("\\delete{$%s$}", keyWdT[i].word))
 	} else if i == Id {
-		fptex.WriteString(fmt.Sprintf("\\delete{%s}", cToken.U.id))
+		fptex.WriteString(fmt.Sprintf("\\delete{%s}", cToken.U.ID))
 	} else if i == Num {
-		fptex.WriteString(fmt.Sprintf("\\delete{%s}", cToken.U.value))
+		fptex.WriteString(fmt.Sprintf("\\delete{%s}", strconv.Itoa(cToken.U.Value)))
 	}
 }
 
 // エラーメッセージを .tex ファイルに出力
-func ErrorMessage(m string) {
+func ErrorMessage(m string, fptex *os.File) {
 	fptex.WriteString(fmt.Sprintf("$^{%s}$", m))
-	errorNocheck()
+	errorNocheck(fptex)
 }
 
 // エラーメッセージを出力しコンパイル終了
-func ErrorF(m string) {
-	ErrorMessage(m)
+func ErrorF(m string, fptex *os.File) {
+	ErrorMessage(m, fptex)
 	fptex.WriteString("fatal errors\n\\end{document}\n")
 	if errorNo != 0 {
 		fmt.Printf("total %d errors\n", errorNo)
@@ -284,14 +285,14 @@ func ErrorN() int {
 }
 
 // 次の 1 文字を返す
-func nextChar() byte {
+func nextChar(scanner *bufio.Scanner, fptex *os.File) byte {
 	var ch byte
 	if lineIndex == -1 {
 		if (scanner.Scan()) && (len(scanner.Text()) <= 120) {
 			copy(line[:], []byte(scanner.Text()))
 			lineIndex = 0
 		} else {
-			ErrorF("end of file\n")
+			ErrorF("end of file\n", fptex)
 		}
 	}
 	if ch = line[lineIndex]; ch == '\n' {
@@ -302,13 +303,13 @@ func nextChar() byte {
 	return ch
 }
 
-func NextToken() Token {
+func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 	var i int = 0
 	var num int
 	var cc KeyID
 	var temp Token
 	var ident [MAXNAME]byte
-	printcToken() // 前のトークンを印字
+	printcToken(fptex) // 前のトークンを印字
 	spaces = 0
 	cr = 0
 
@@ -323,7 +324,7 @@ func NextToken() Token {
 		} else {
 			break
 		}
-		ch = nextChar()
+		ch = nextChar(scanner, fptex)
 	}
 
 	cc = charClassT[ch]
@@ -334,14 +335,14 @@ func NextToken() Token {
 				ident[i] = ch
 			}
 			i++
-			ch = nextChar()
+			ch = nextChar(scanner, fptex)
 			if charClassT[ch] == Letter || charClassT[ch] == Digit {
 				continue
 			}
 			break
 		}
 		if i >= MAXNAME {
-			ErrorMessage("too long token")
+			ErrorMessage("too long token", fptex)
 			i = MAXNAME - 1
 		}
 		for i = 0; i < int(End_of_KeyWd); i++ {
@@ -355,47 +356,47 @@ func NextToken() Token {
 		}
 		// ユーザの宣言した名前の場合
 		temp.Kind = Id
-		temp.U.id = ident
+		temp.U.ID = ident
 
 	case Digit: // number
 		num = 0
 		for {
 			num = 10*num + int(ch-'0')
 			i++
-			ch = nextChar()
+			ch = nextChar(scanner, fptex)
 			if charClassT[ch] == Digit {
 				continue
 			}
 			break
 		}
 		if i > MAXNUM {
-			ErrorMessage("too large number")
+			ErrorMessage("too large number", fptex)
 		}
 		temp.Kind = Num
-		temp.U.value = num
+		temp.U.Value = num
 
 	case Colon:
-		if ch = nextChar(); ch == '=' { // :=
-			ch = nextChar()
+		if ch = nextChar(scanner, fptex); ch == '=' { // :=
+			ch = nextChar(scanner, fptex)
 			temp.Kind = Assign
 		} else {
 			temp.Kind = Nul
 		}
 
 	case Lss:
-		if ch = nextChar(); ch == '=' { // <=
-			ch = nextChar()
+		if ch = nextChar(scanner, fptex); ch == '=' { // <=
+			ch = nextChar(scanner, fptex)
 			temp.Kind = LssEq
 		} else if ch == '>' { // <>
-			ch = nextChar()
+			ch = nextChar(scanner, fptex)
 			temp.Kind = NotEq
 		} else {
 			temp.Kind = Lss
 		}
 
 	case Gtr:
-		if ch = nextChar(); ch == '=' { // >=
-			ch = nextChar()
+		if ch = nextChar(scanner, fptex); ch == '=' { // >=
+			ch = nextChar(scanner, fptex)
 			temp.Kind = GtrEq
 		} else {
 			temp.Kind = Gtr
@@ -403,7 +404,7 @@ func NextToken() Token {
 
 	default:
 		temp.Kind = cc
-		ch = nextChar()
+		ch = nextChar(scanner, fptex)
 	}
 
 	cToken = temp
@@ -413,25 +414,24 @@ func NextToken() Token {
 
 // t.Kind == k のチェック
 // t.Kind == k なら次のトークンを読んで返す
-// t.Kind != k ならエラーメッセージを出し、 t, k が共に記号
-// 予約語なら
-// t を捨て次のトークンを読んで返す (t を k で置き換えたことになる)
+// t.Kind != k ならエラーメッセージを出す
+// t, k が共に記号か予約語なら t を捨て次のトークンを読んで返す (t を k で置き換えたことになる)
 // それ以外の場合、k を挿入したことにして t を返す
-func CheckGet(t Token, k KeyID) Token {
+func CheckGet(t Token, k KeyID, scanner *bufio.Scanner, fptex *os.File) Token {
 	if t.Kind == k {
-		return NextToken()
+		return NextToken(scanner, fptex)
 	}
 	if (IsKeyWd(t.Kind) && IsKeyWd(k)) || (IsKeySym(t.Kind) && IsKeySym(k)) {
-		ErrorDelete()
-		ErrorInsert(k)
-		return NextToken()
+		ErrorDelete(fptex)
+		ErrorInsert(k, fptex)
+		return NextToken(scanner, fptex)
 	}
-	ErrorInsert(k)
+	ErrorInsert(k, fptex)
 	return t
 }
 
 // 空白や改行の印字
-func printSpaces() {
+func printSpaces(fptex *os.File) {
 	for cr > 0 {
 		cr--
 		fptex.WriteString("\\ \\par\n")
@@ -445,14 +445,14 @@ func printSpaces() {
 }
 
 // 現在のトークンの印字
-func printcToken() {
+func printcToken(fptex *os.File) {
 	i := int(cToken.Kind)
 	if printed {
 		printed = false
 		return
 	}
 	printed = true
-	printSpaces()
+	printSpaces(fptex)
 	if i < int(End_of_KeyWd) { // 予約語
 		fptex.WriteString(fmt.Sprintf("{\\bf %s}", keyWdT[i].word))
 	} else if i < int(End_of_KeySym) { // 演算子か区切り記号
@@ -460,16 +460,16 @@ func printcToken() {
 	} else if i == int(Id) { // Identfier
 		switch idKind {
 		case table.VarID:
-			fptex.WriteString(fmt.Sprintf("%s", cToken.U.id))
+			fptex.WriteString(fmt.Sprintf("%s", cToken.U.ID))
 		case table.ParID:
-			fptex.WriteString(fmt.Sprintf("{\\sl %s}", cToken.U.id))
+			fptex.WriteString(fmt.Sprintf("{\\sl %s}", cToken.U.ID))
 		case table.FuncID:
-			fptex.WriteString(fmt.Sprintf("{\\it %s}", cToken.U.id))
+			fptex.WriteString(fmt.Sprintf("{\\it %s}", cToken.U.ID))
 		case table.ConstID:
-			fptex.WriteString(fmt.Sprintf("{\\sf %s}", cToken.U.id))
+			fptex.WriteString(fmt.Sprintf("{\\sf %s}", cToken.U.ID))
 		}
 	} else if i == int(Num) {
-		fptex.WriteString(fmt.Sprintf("%d", cToken.U.value))
+		fptex.WriteString(fmt.Sprintf("%d", cToken.U.Value))
 	}
 }
 
