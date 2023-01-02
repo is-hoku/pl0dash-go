@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/is-hoku/pl0dash-go/table"
 )
 
 const MAXLINE int = 120           // 1 行の最大文字数
@@ -25,13 +23,38 @@ var line [MAXLINE]byte // 1 行分の入力バッファ
 var lineIndex int      // 次に読む文字の位置
 var ch byte            // 最後に読んだ文字
 var cToken Token       // 最後に読んだトークン
-var idKind table.KindT // 現トークンの種類
+var idKind KindT       // 現トークンの種類
 var spaces int         // そのトークンの前のスペースの個数
 var cr int             // その前の CR の個数
 var printed bool       // トークンは印字済みか
 var errorNo int = 0    // 出力したエラーの数
 
 type KeyID int // キーの文字の種類
+
+type KindT int        // Identifier の種類
+type RelAddr struct { // 変数・パラメタ・関数のアドレスの型
+	level int
+	addr  int
+}
+type tableE struct {
+	kind KindT         // 名前の種類
+	name [MAXNAME]byte // 名前のつづり
+	u    struct {
+		value int // 定数の場合：値
+		f     struct {
+			raddr RelAddr // 関数の場合：先頭アドレス
+			pars  int     // 関数の場合：パラメタ数
+		}
+		raddr RelAddr // 変数・パラメタの場合：アドレス
+	}
+}
+
+const (
+	VarID KindT = iota
+	FuncID
+	ParID
+	ConstID
+)
 
 const (
 	Begin KeyID = iota
@@ -459,13 +482,13 @@ func printcToken(fptex *os.File) {
 		fptex.WriteString(fmt.Sprintf("$%s$", keyWdT[i].word))
 	} else if i == int(Id) { // Identfier
 		switch idKind {
-		case table.VarID:
+		case VarID:
 			fptex.WriteString(fmt.Sprintf("%s", cToken.U.ID))
-		case table.ParID:
+		case ParID:
 			fptex.WriteString(fmt.Sprintf("{\\sl %s}", cToken.U.ID))
-		case table.FuncID:
+		case FuncID:
 			fptex.WriteString(fmt.Sprintf("{\\it %s}", cToken.U.ID))
-		case table.ConstID:
+		case ConstID:
 			fptex.WriteString(fmt.Sprintf("{\\sf %s}", cToken.U.ID))
 		}
 	} else if i == int(Num) {
@@ -473,6 +496,6 @@ func printcToken(fptex *os.File) {
 	}
 }
 
-func SetIdKind(k table.KindT) {
+func SetIdKind(k KindT) {
 	idKind = k
 }

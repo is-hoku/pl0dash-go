@@ -71,7 +71,7 @@ func constDecl(scanner *bufio.Scanner, fptex *os.File) {
 			temp = token
 			token = getsource.CheckGet(getsource.NextToken(scanner, fptex), getsource.Equal, scanner, fptex) // 名前の次は = のはず
 			if token.Kind == getsource.Num {
-				table.EnterTconst(temp.U.ID, token.U.Value, fptex) // 定数名と値をテーブルに
+				table.EnterTconst(temp.U.ID[:], token.U.Value, fptex) // 定数名と値をテーブルに
 			} else {
 				getsource.ErrorType("number", fptex)
 			}
@@ -96,8 +96,8 @@ func constDecl(scanner *bufio.Scanner, fptex *os.File) {
 func varDecl(scanner *bufio.Scanner, fptex *os.File) {
 	for {
 		if token.Kind == getsource.Id {
-			getsource.SetIdKind(table.VarID)   // 印字のための情報セット
-			table.EnterTvar(token.U.ID, fptex) // 変数名をテーブルに、番地は table が決める
+			getsource.SetIdKind(table.VarID)      // 印字のための情報セット
+			table.EnterTvar(token.U.ID[:], fptex) // 変数名をテーブルに、番地は table が決める
 			token = getsource.NextToken(scanner, fptex)
 		} else {
 			getsource.ErrorMissingID(fptex)
@@ -121,13 +121,13 @@ func funcDecl(scanner *bufio.Scanner, fptex *os.File) {
 		getsource.SetIdKind(table.FuncID) // 印字のための情報セット
 		// 関数名をテーブルに登録
 		// その先頭番地は次のコードの番地 NextCode()
-		fIndex := table.EnterTfunc(token.U.ID, codegen.NextCode(), fptex)
+		fIndex := table.EnterTfunc(token.U.ID[:], codegen.NextCode(), fptex)
 		token = getsource.CheckGet(getsource.NextToken(scanner, fptex), getsource.Lparen, scanner, fptex)
-		blockBegin(FIRSTADDR) // パラメタ名のレベルは関数のブロックと同じ
+		table.BlockBegin(FIRSTADDR) // パラメタ名のレベルは関数のブロックと同じ
 		for {
 			if token.Kind == getsource.Id { // パラメタ名がある場合
-				getsource.SetIdKind(table.ParID)   // 印字のための情報セット
-				table.EnterTpar(token.U.ID, fptex) // パラメタ名をテーブルに登録
+				getsource.SetIdKind(table.ParID)      // 印字のための情報セット
+				table.EnterTpar(token.U.ID[:], fptex) // パラメタ名をテーブルに登録
 				token = getsource.NextToken(scanner, fptex)
 			} else {
 				break

@@ -1,8 +1,10 @@
 package table
 
 import (
-	"fmt"
+	"bytes"
 	"os"
+
+	"github.com/is-hoku/pl0dash-go/getsource"
 )
 
 const MAXNAME int = 31   // 名前の最大の長さ
@@ -32,8 +34,9 @@ var tIndex int = 0             // 名前表のインデックス
 var level int = -1             // 現在のブロックレベル
 var index [MAXLEVEL]int        // index[i] にはブロックレベル i の最後のインデックス
 var addr [MAXLEVEL]int         // addr[i] にはブロックレベル i の最後の変数の番地
-var tfIndex int
-var localAddr int // 現在のブロックの最後の変数の番地
+var tfIndex int                // 名前表の関数を保持しているインデックス (一時)
+var localAddr int              // 現在のブロックの最後の変数の番地
+// 引数付き関数は引数、関数、関数内の変数の順番で実行時にスタックされるため、ブロックのデータ領域には退避領域、 RetAdr, a, b, c の順でスタックされることを考慮すると top (スタックの最後尾)  が指すところから 2 番地目から変数がある
 
 const (
 	VarID KindT = iota
@@ -42,12 +45,46 @@ const (
 	ConstID
 )
 
+// ブロックの始まり (最初の変数の番地) で呼ばれる
+func BlockBegin(firstAddr int, fptex *os.File) {
+	if level == -1 { // 主ブロックの初期設定
+		localAddr = firstAddr
+		tIndex = 0
+		level++
+		return
+	}
+	if level == MAXLEVEL-1 {
+		getsource.ErrorF("too many nested blocks", fptex)
+	}
+	index[level] = tIndex // 今までのブロックの情報を格納
+	addr[level] = localAddr
+	localAddr = firstAddr // 新しいブロックの最初の変数の番地
+	level++               // 新しいブロックのレベル
+	return
+}
+
+// ブロックの終わりで呼ばれる
+func BlockEnd() {
+	level--
+	tIndex = index[level] // 一つ外側のブロックの情報を回復
+	localAddr = addr[level]
+}
+
+// 現ブロックのレベルを返す
+func BLevel() int {
+	return level
+}
+
+// 現ブロックの関数のパラメタ数を返す
+func FPars() int {
+	return nameTable[index[level-1]].u.f.pars
+}
 func enterT(id []byte, fptex *os.File) { // 名前表に名前を登録
 	if tIndex < MAXTABLE {
-		tIndex++
 		copy(id, nameTable[tIndex].name[:])
+		tIndex++
 	} else {
-		errorF("too many names", fptex)
+		getsource.ErrorF("too many names", fptex)
 	}
 }
 
@@ -56,9 +93,9 @@ func EnterTfunc(id []byte, v int, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].kind = FuncID
 	nameTable[tIndex].u.f.raddr.level = level
-	nameTable[tIndex].u.f.raddr.addr = v // 関数の先頭番地
+	nameTable[tIndex].u.f.raddr.addr = v // 関数の先頭番地 (目的コード)
 	nameTable[tIndex].u.f.pars = 0       // パラメタ数の初期値
-	tfIndex = tIndex
+	tfIndex = tIndex                     // 関数名のインデックスを一時保持
 	return tIndex
 }
 
@@ -76,8 +113,8 @@ func EnterTvar(id []byte, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].kind = VarID
 	nameTable[tIndex].u.raddr.level = level
+	nameTable[tIndex].u.raddr.addr = localAddr // localAddr はブロックの最初の変数の番地 (はじめは 2)
 	localAddr++
-	nameTable[tIndex].u.raddr.addr = localAddr
 	return tIndex
 }
 
@@ -100,36 +137,48 @@ func Endpar() {
 	}
 }
 
-func BlockBegin(firstAddr int) { // ブロックの始まり (最初の変数の番地) で呼ばれる
-	if level == -1 {
+// 名前表 [ti] の値 (関数の先頭番地) の変更
+func ChangeV(ti int, newVal int) {
+	nameTable[ti].u.f.raddr.addr = newVal
+}
 
+func SearchT(id []byte, k KindT, fptex *os.File) int {
+	var i int
+	copy(id, nameTable[0].name[:]) // 番兵を立てる
+	for i = tIndex; bytes.Equal(id, nameTable[i].name[:]) == false; i-- {
+	}
+	if i != 0 { // 名前があった
+		return i
+	} else { // 名前がなかった
+		getsource.ErrorType("undef", fptex)
+		if k == VarID {
+			return EnterTvar(id, fptex) // 変数名の時は仮登録
+		}
+		return 0
 	}
 }
 
-// エラーが多いと終了 (panic)
-func errorNocheck(fptex *os.File) {
-	errorNo++
-	if errorNo > MAXERROR {
-		fptex.WriteString("too many errors\n\\end{document}\n")
-		panic("abort compilation")
-	}
+// 名前表 [i] の種類を返す
+func RetKindT(i int) KindT {
+	return nameTable[i].kind
 }
 
-var errorNo int = 0     // 出力したエラーの数
-const MAXERROR int = 30 // これ以上のエラーがあると終了
-
-// エラーメッセージを .tex ファイルに出力
-func errorMessage(m string, fptex *os.File) {
-	fptex.WriteString(fmt.Sprintf("$^{%s}$", m))
-	errorNocheck(fptex)
+// 名前表 [ti] のアドレスを返す
+func RetRelAddr(ti int) RelAddr {
+	return nameTable[ti].u.raddr
 }
 
-// エラーメッセージを出力しコンパイル終了
-func errorF(m string, fptex *os.File) {
-	errorMessage(m, fptex)
-	fptex.WriteString("fatal errors\n\\end{document}\n")
-	if errorNo != 0 {
-		fmt.Printf("total %d errors\n", errorNo)
-	}
-	panic("abort compilation\n")
+// 名前表 [ti] の value を返す
+func RetVal(ti int) int {
+	return nameTable[ti].u.value
+}
+
+// 名前表 [ti] の関数のパラメタ数を返す
+func RetPars(ti int) int {
+	return nameTable[ti].u.f.pars
+}
+
+// そのブロックで実行時に必要とするメモリ容量
+func RetFrameL() int {
+	return localAddr
 }
