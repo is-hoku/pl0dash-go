@@ -53,7 +53,7 @@ const (
 type inst struct {
 	opCode OpCode
 	u      struct {
-		addr  table.RelAddr
+		addr  getsource.RelAddr
 		value int
 		optr  Operator
 	}
@@ -66,6 +66,34 @@ func GenCodeV(op OpCode, v int, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = op
 	code[cIndex].u.value = v
+	return cIndex
+}
+
+// 命令語の生成、アドレス部に演算命令
+func GenCodeT(op OpCode, ti int, fptex *os.File) int {
+	checkMax(fptex)
+	code[cIndex].opCode = op
+	code[cIndex].u.addr = table.RetRelAddr(ti)
+	return cIndex
+}
+
+// 命令語の生成、アドレス部に演算命令
+func GenCodeO(p Operator, fptex *os.File) int {
+	checkMax(fptex)
+	code[cIndex].opCode = Opr
+	code[cIndex].u.optr = p
+	return cIndex
+}
+
+// ret 命令語の生成
+func GenCodeR(fptex *os.File) int {
+	if code[cIndex].opCode == Ret { // 直前が ret なら生成せず
+		return cIndex
+	}
+	checkMax(fptex)
+	code[cIndex].opCode = Ret
+	code[cIndex].u.addr.Level = table.BLevel()
+	code[cIndex].u.addr.Addr = table.FPars() // パラメタ数 (実行スタックの解放用)
 	return cIndex
 }
 

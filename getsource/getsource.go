@@ -31,23 +31,24 @@ var errorNo int = 0    // 出力したエラーの数
 
 type KeyID int // キーの文字の種類
 
-type KindT int        // Identifier の種類
 type RelAddr struct { // 変数・パラメタ・関数のアドレスの型
-	level int
-	addr  int
+	Level int
+	Addr  int
 }
-type tableE struct {
-	kind KindT         // 名前の種類
-	name [MAXNAME]byte // 名前のつづり
-	u    struct {
-		value int // 定数の場合：値
-		f     struct {
-			raddr RelAddr // 関数の場合：先頭アドレス
-			pars  int     // 関数の場合：パラメタ数
+type TableE struct {
+	Kind KindT         // 名前の種類
+	Name [MAXNAME]byte // 名前のつづり
+	U    struct {
+		Value int // 定数の場合：値
+		F     struct {
+			Raddr RelAddr // 関数の場合：先頭アドレス
+			Pars  int     // 関数の場合：パラメタ数
 		}
-		raddr RelAddr // 変数・パラメタの場合：アドレス
+		Raddr RelAddr // 変数・パラメタの場合：アドレス
 	}
 }
+
+type KindT int // Identifier の種類
 
 const (
 	VarID KindT = iota
