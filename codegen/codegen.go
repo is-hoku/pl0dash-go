@@ -32,6 +32,31 @@ const (
 	Jpc
 )
 
+func (o OpCode) String() string {
+	switch o {
+	case Lit:
+		return "lit"
+	case Opr:
+		return "opr"
+	case Lod:
+		return "lod"
+	case Sto:
+		return "sto"
+	case Cal:
+		return "cal"
+	case Ret:
+		return "ret"
+	case Ict:
+		return "ict"
+	case Jmp:
+		return "jmp"
+	case Jpc:
+		return "jpc"
+	default:
+		return "unknown"
+	}
+}
+
 type Operator int // 演算命令のコード
 const (
 	Neg Operator = iota
@@ -50,6 +75,41 @@ const (
 	Wrl
 )
 
+func (o Operator) String() string {
+	switch o {
+	case Neg:
+		return "neg"
+	case Add:
+		return "add"
+	case Sub:
+		return "sub"
+	case Mul:
+		return "mul"
+	case Div:
+		return "div"
+	case Odd:
+		return "odd"
+	case Eq:
+		return "eq"
+	case Ls:
+		return "ls"
+	case Gr:
+		return "gr"
+	case Neq:
+		return "neq"
+	case Lseq:
+		return "lseq"
+	case Greq:
+		return "greq"
+	case Wrt:
+		return "wrt"
+	case Wrl:
+		return "wrl"
+	default:
+		return "unknown"
+	}
+}
+
 // 命令語の型
 type inst struct {
 	opCode OpCode
@@ -67,6 +127,9 @@ func GenCodeV(op OpCode, v int, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = op
 	code[cIndex].u.value = v
+	//fmt.Println("level", table.BLevel())
+	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.value)
+	//fmt.Println("")
 	return cIndex
 }
 
@@ -75,6 +138,9 @@ func GenCodeT(op OpCode, ti int, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = op
 	code[cIndex].u.addr = table.RetRelAddr(ti)
+	//fmt.Println("level", table.BLevel())
+	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.addr)
+	//fmt.Println("")
 	return cIndex
 }
 
@@ -83,6 +149,9 @@ func GenCodeO(p Operator, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = Opr
 	code[cIndex].u.optr = p
+	//fmt.Println("level", table.BLevel())
+	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.optr)
+	//fmt.Println("")
 	return cIndex
 }
 
@@ -95,6 +164,10 @@ func GenCodeR(fptex *os.File) int {
 	code[cIndex].opCode = Ret
 	code[cIndex].u.addr.Level = table.BLevel()
 	code[cIndex].u.addr.Addr = table.FPars() // パラメタ数 (実行スタックの解放用)
+	//fmt.Println("level", table.BLevel())
+	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.addr.Level, code[cIndex].u.addr.Addr)
+
+	//fmt.Println("")
 	return cIndex
 }
 
@@ -126,6 +199,12 @@ func Execute(fptex *os.File) {
 	display[0] = 0 // 主ブロックの先頭番地は 0
 	for {
 		i = code[pc] // これから実行する命令語
+		//fmt.Println("PC:", pc)
+		//fmt.Println("code:", i.opCode, i.u.addr, i.u.optr, i.u.value)
+		//fmt.Println("stack:", stack[:30])
+		//fmt.Println("display:", display)
+		//fmt.Println("top:", top)
+		//fmt.Println("")
 		pc++
 		switch i.opCode {
 		case Lit:
@@ -133,6 +212,7 @@ func Execute(fptex *os.File) {
 			top++
 		case Lod:
 			stack[top] = stack[display[i.u.addr.Level]+i.u.addr.Addr]
+			top++
 		case Sto:
 			top--
 			stack[display[i.u.addr.Level]+i.u.addr.Addr] = stack[top]
@@ -159,6 +239,11 @@ func Execute(fptex *os.File) {
 			}
 		case Jmp:
 			pc = i.u.value
+		case Jpc:
+			top--
+			if stack[top] == 0 {
+				pc = i.u.value
+			}
 		case Opr:
 			switch i.u.optr {
 			case Neg:

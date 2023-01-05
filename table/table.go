@@ -1,33 +1,13 @@
 package table
 
 import (
-	"bytes"
 	"os"
 
 	"github.com/is-hoku/pl0dash-go/getsource"
 )
 
-const MAXNAME int = 31   // 名前の最大の長さ
 const MAXLEVEL int = 5   // ブロックの最大深さ
 const MAXTABLE int = 100 // 名前表の最大長さ
-
-//type KindT int        // Identifier の種類
-//type RelAddr struct { // 変数・パラメタ・関数のアドレスの型
-//	level int
-//	addr  int
-//}
-//type tableE struct {
-//	kind KindT         // 名前の種類
-//	name [MAXNAME]byte // 名前のつづり
-//	u    struct {
-//		value int // 定数の場合：値
-//		f     struct {
-//			raddr RelAddr // 関数の場合：先頭アドレス
-//			pars  int     // 関数の場合：パラメタ数
-//		}
-//		raddr RelAddr // 変数・パラメタの場合：アドレス
-//	}
-//}
 
 var nameTable [MAXTABLE]getsource.TableE // 名前表
 var tIndex int = 0                       // 名前表のインデックス
@@ -65,6 +45,11 @@ func BlockBegin(firstAddr int, fptex *os.File) {
 
 // ブロックの終わりで呼ばれる
 func BlockEnd() {
+	if level == 0 {
+		tIndex = 0
+		localAddr = 0
+		return
+	}
 	level--
 	tIndex = index[level] // 一つ外側のブロックの情報を回復
 	localAddr = addr[level]
@@ -77,39 +62,45 @@ func BLevel() int {
 
 // 現ブロックの関数のパラメタ数を返す
 func FPars() int {
+	if level == 0 {
+		return 0 // 主ブロックにはパラメタがない
+	}
 	return nameTable[index[level-1]].U.F.Pars
 }
-func enterT(id []byte, fptex *os.File) { // 名前表に名前を登録
+
+func enterT(id string, fptex *os.File) { // 名前表に名前を登録
 	if tIndex < MAXTABLE {
-		copy(id, nameTable[tIndex].Name[:])
 		tIndex++
+		nameTable[tIndex].Name = id
 	} else {
 		getsource.ErrorF("too many names", fptex)
 	}
 }
 
 // 名前表に関数名と先頭番地を登録
-func EnterTfunc(id []byte, v int, fptex *os.File) int {
+func EnterTfunc(id string, v int, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].Kind = getsource.FuncID
 	nameTable[tIndex].U.F.Raddr.Level = level
 	nameTable[tIndex].U.F.Raddr.Addr = v // 関数の先頭番地 (目的コード)
 	nameTable[tIndex].U.F.Pars = 0       // パラメタ数の初期値
 	tfIndex = tIndex                     // 関数名のインデックスを一時保持
+	//fmt.Println("nameTable", tIndex, nameTable[tIndex].Kind, nameTable[tIndex-1].Name, nameTable[tIndex].U.F.Raddr.Level, nameTable[tIndex].U.F.Raddr.Addr)
 	return tIndex
 }
 
 // 名前表にパラメタ名を登録
-func EnterTpar(id []byte, fptex *os.File) int {
+func EnterTpar(id string, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].Kind = getsource.ParID
 	nameTable[tIndex].U.Raddr.Level = level
 	nameTable[tfIndex].U.F.Pars++ // 関数のパラメタ数のカウント
+	//fmt.Println("nameTable", tIndex, nameTable[tIndex].Kind, nameTable[tIndex-1].Name, nameTable[tIndex].U.F.Raddr.Level, nameTable[tfIndex].U.F.Pars)
 	return tIndex
 }
 
 // 名前表に変数名を登録
-func EnterTvar(id []byte, fptex *os.File) int {
+func EnterTvar(id string, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].Kind = getsource.VarID
 	nameTable[tIndex].U.Raddr.Level = level
@@ -119,7 +110,7 @@ func EnterTvar(id []byte, fptex *os.File) int {
 }
 
 // 名前表に定数名とその値を登録
-func EnterTconst(id []byte, v int, fptex *os.File) int {
+func EnterTconst(id string, v int, fptex *os.File) int {
 	enterT(id, fptex)
 	nameTable[tIndex].Kind = getsource.ConstID
 	nameTable[tIndex].U.Value = v
@@ -142,10 +133,10 @@ func ChangeV(ti int, newVal int) {
 	nameTable[ti].U.F.Raddr.Addr = newVal
 }
 
-func SearchT(id []byte, k getsource.KindT, fptex *os.File) int {
+func SearchT(id string, k getsource.KindT, fptex *os.File) int {
 	var i int
-	copy(id, nameTable[0].Name[:]) // 番兵を立てる
-	for i = tIndex; bytes.Equal(id, nameTable[i].Name[:]) == false; i-- {
+	nameTable[0].Name = id // 番兵を立てる
+	for i = tIndex; id != nameTable[i].Name; i-- {
 	}
 	if i != 0 { // 名前があった
 		return i
@@ -165,7 +156,18 @@ func RetKindT(i int) getsource.KindT {
 
 // 名前表 [ti] のアドレスを返す
 func RetRelAddr(ti int) getsource.RelAddr {
-	return nameTable[ti].U.Raddr
+	switch nameTable[ti].Kind {
+	case getsource.VarID:
+		return nameTable[ti].U.Raddr
+	case getsource.FuncID:
+		return nameTable[ti].U.F.Raddr
+	case getsource.ParID:
+		return nameTable[ti].U.Raddr
+	case getsource.ConstID:
+		return nameTable[ti].U.Raddr
+	default:
+		return nameTable[ti].U.Raddr
+	}
 }
 
 // 名前表 [ti] の value を返す

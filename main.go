@@ -17,15 +17,14 @@ func main() {
 		return
 	}
 	fileName := os.Args[1]
-	f, tex, scanner, err := getsource.OpenSource(fileName)
+	tex, scanner, err := getsource.OpenSource(fileName)
 	if err != nil {
 		err := errors.New(fmt.Sprintf("cannot open the file: %s", err))
 		fmt.Println(err)
 		return
 	}
 	defer tex.Close()
-	defer f.Close()
-	if err := compile.Compile(f, scanner); err != nil {
+	if err := compile.Compile(tex, scanner); err != nil {
 		codegen.Execute(tex)
 	}
 	if err != nil {

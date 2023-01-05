@@ -19,15 +19,16 @@ const TYPE_C string = "#00FF00"   // タイプエラー文字の色
 // var fpi *os.File           // ソースファイル
 // var scanner *bufio.Scanner // ファイルを 1 行ずつ読むスキャナ
 // var fptex *os.File     // LaTex 出力ファイル
-var line [MAXLINE]byte // 1 行分の入力バッファ
-var lineIndex int      // 次に読む文字の位置
-var ch byte            // 最後に読んだ文字
-var cToken Token       // 最後に読んだトークン
-var idKind KindT       // 現トークンの種類
-var spaces int         // そのトークンの前のスペースの個数
-var cr int             // その前の CR の個数
-var printed bool       // トークンは印字済みか
-var errorNo int = 0    // 出力したエラーの数
+// var line [MAXLINE]byte // 1 行分の入力バッファ
+var line string     // 1 行分の入力バッファ
+var lineIndex int   // 次に読む文字の位置
+var ch byte         // 最後に読んだ文字
+var cToken Token    // 最後に読んだトークン
+var idKind KindT    // 現トークンの種類
+var spaces int      // そのトークンの前のスペースの個数
+var cr int          // その前の CR の個数
+var printed bool    // トークンは印字済みか
+var errorNo int = 0 // 出力したエラーの数
 
 type KeyID int // キーの文字の種類
 
@@ -36,8 +37,8 @@ type RelAddr struct { // 変数・パラメタ・関数のアドレスの型
 	Addr  int
 }
 type TableE struct {
-	Kind KindT         // 名前の種類
-	Name [MAXNAME]byte // 名前のつづり
+	Kind KindT  // 名前の種類
+	Name string // 名前のつづり
 	U    struct {
 		Value int // 定数の場合：値
 		F     struct {
@@ -56,6 +57,21 @@ const (
 	ParID
 	ConstID
 )
+
+func (k KindT) String() string {
+	switch k {
+	case VarID:
+		return "var"
+	case FuncID:
+		return "func"
+	case ParID:
+		return "par"
+	case ConstID:
+		return "const"
+	default:
+		return "unknown"
+	}
+}
 
 const (
 	Begin KeyID = iota
@@ -99,8 +115,87 @@ const (
 	Others
 )
 
+func (k KeyID) String() string {
+	switch k {
+	case Begin:
+		return "begin"
+	case End:
+		return "end"
+	case If:
+		return "if"
+	case Then:
+		return "then"
+	case While:
+		return "while"
+	case Do:
+		return "do"
+	case Ret:
+		return "ret"
+	case Func:
+		return "func"
+	case Var:
+		return "var"
+	case Const:
+		return "const"
+	case Odd:
+		return "odd"
+	case Write:
+		return "write"
+	case WriteLn:
+		return "writeln"
+	case Plus:
+		return "plus"
+	case Minus:
+		return "minus"
+	case Mult:
+		return "mult"
+	case Div:
+		return "div"
+	case Lparen:
+		return "lparen"
+	case Rparen:
+		return "rparen"
+	case Equal:
+		return "equal"
+	case Lss:
+		return "lss"
+	case Gtr:
+		return "gtr"
+	case NotEq:
+		return "noteq"
+	case LssEq:
+		return "lsseq"
+	case GtrEq:
+		return "gtreq"
+	case Comma:
+		return "comma"
+	case Period:
+		return "period"
+	case Semicolon:
+		return "semicolon"
+	case Assign:
+		return "assign"
+	case Id:
+		return "id"
+	case Num:
+		return "num"
+	case Nul:
+		return "nul"
+	case Letter:
+		return "letter"
+	case Digit:
+		return "digit"
+	case Colon:
+		return "colon"
+	case Others:
+		return "others"
+	default:
+		return "unknown"
+	}
+}
+
 type IDVal struct {
-	ID    [MAXNAME]byte
+	ID    string
 	Value int
 }
 
@@ -195,18 +290,18 @@ func initCharClassT() {
 	charClassT[':'] = Colon
 }
 
-func OpenSource(fileName string) (*os.File, *os.File, *bufio.Scanner, error) {
+func OpenSource(fileName string) (*os.File, *bufio.Scanner, error) {
 	fpi, err := os.Open(fileName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	texFileName := fileName + ".tex"
 	fptex, err := os.Create(texFileName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	scanner := bufio.NewScanner(fpi)
-	return fpi, fptex, scanner, nil
+	return fptex, scanner, nil
 }
 
 func InitSource(fptex *os.File) {
@@ -313,16 +408,22 @@ func nextChar(scanner *bufio.Scanner, fptex *os.File) byte {
 	var ch byte
 	if lineIndex == -1 {
 		if (scanner.Scan()) && (len(scanner.Text()) <= 120) {
-			copy(line[:], []byte(scanner.Text()))
+			line = scanner.Text()
+			//fmt.Println("line", line)
 			lineIndex = 0
 		} else {
 			ErrorF("end of file\n", fptex)
 		}
 	}
-	if ch = line[lineIndex]; ch == '\n' {
+	if lineIndex >= len(line) {
 		lineIndex = -1
 		return '\n'
 	}
+	//fmt.Println("index:", lineIndex)
+	//fmt.Println(line[lineIndex])
+	//fmt.Println("CHAR:", ch)
+	ch = line[lineIndex]
+	//fmt.Println("cahr", ch)
 	lineIndex++
 	return ch
 }
@@ -332,7 +433,8 @@ func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 	var num int
 	var cc KeyID
 	var temp Token
-	var ident [MAXNAME]byte
+	var ident string
+
 	printcToken(fptex) // 前のトークンを印字
 	spaces = 0
 	cr = 0
@@ -356,7 +458,7 @@ func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 	case Letter: // identifier
 		for {
 			if i < MAXNAME {
-				ident[i] = ch
+				ident += string(ch)
 			}
 			i++
 			ch = nextChar(scanner, fptex)
@@ -371,7 +473,7 @@ func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 		}
 		for i = 0; i < int(End_of_KeyWd); i++ {
 			// 予約語の場合
-			if string(ident[:]) == keyWdT[i].word {
+			if ident == keyWdT[i].word {
 				temp.Kind = keyWdT[i].keyID
 				cToken = temp
 				printed = false
@@ -433,6 +535,7 @@ func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 
 	cToken = temp
 	printed = false
+	//fmt.Println("token", temp)
 	return temp
 }
 

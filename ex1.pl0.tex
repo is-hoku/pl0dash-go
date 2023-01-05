@@ -1,0 +1,27 @@
+\documentstyle[12pt]{article}
+\begin{document}
+\fboxsep=Opt
+\def\insert#1{$\fbox{#1}$}
+\def\delete#1{$\fboxrule=.5mm\fbox{#1}$}
+\rm
+{\bf begin}\ \par
+{\bf function}\ {\it multiply}$(${\sl x}$,$\ {\sl y}$)$\ \par
+\ \ \ \ \ {\bf var}\ a$,$b$,$c$;$\ \par
+{\bf begin}\ a$:=${\sl x}$;$\ b$:=${\sl y}$;$\ c$:=$0$;$\ \par
+\ \ \ \ \ {\bf while}\ b$>$0\ {\bf do}\ \par
+\ \ \ \ \ {\bf begin}\ \par
+\ \ \ \ \ {\bf if}\ {\bf odd}\ b\ {\bf then}\ c$:=$c$+$a$;$\ \par
+\ \ \ \ \ a$:=$2$*$a$;$\ b$:=$b$/$2$;$\ \par
+\ \ \ \ \ {\bf end}$;$\ \par
+\ \ \ \ \ {\bf return}\ c$;$\ \par
+{\bf end}$;$\ \par
+\ \par
+{\bf const}\ {\sf m}$=$7$,${\sf n}$=$85$;$\ \par
+{\bf var}\ x$,$y$;$\ \par
+\ \par
+{\bf begin}\ \par
+\ \ \ \ \ x$:=${\sf m}$;$\ y$:=${\sf n}$;$\ \par
+\ \ \ \ \ {\bf write}\ x$;$\ {\bf write}\ y$;$\ {\bf write}\ {\it multiply}$($x$,$y$)$$;$\ \par
+\ \ \ \ \ {\bf writeln}\ \par
+{\bf end}$.$
+\end{document}

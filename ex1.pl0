@@ -14,6 +14,6 @@ var x,y;
 
 begin
 	x:=m; y:=n;
-	write x; write y; writeln; write multiply(x,y);
+	write x; write y; write multiply(x,y);
 	writeln
 end.

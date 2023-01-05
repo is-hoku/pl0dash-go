@@ -71,7 +71,7 @@ func constDecl(scanner *bufio.Scanner, fptex *os.File) {
 			temp = token
 			token = getsource.CheckGet(getsource.NextToken(scanner, fptex), getsource.Equal, scanner, fptex) // 名前の次は = のはず
 			if token.Kind == getsource.Num {
-				table.EnterTconst(temp.U.ID[:], token.U.Value, fptex) // 定数名と値をテーブルに
+				table.EnterTconst(temp.U.ID, token.U.Value, fptex) // 定数名と値をテーブルに
 			} else {
 				getsource.ErrorType("number", fptex)
 			}
@@ -96,8 +96,8 @@ func constDecl(scanner *bufio.Scanner, fptex *os.File) {
 func varDecl(scanner *bufio.Scanner, fptex *os.File) {
 	for {
 		if token.Kind == getsource.Id {
-			getsource.SetIdKind(getsource.VarID)  // 印字のための情報セット
-			table.EnterTvar(token.U.ID[:], fptex) // 変数名をテーブルに、番地は table が決める
+			getsource.SetIdKind(getsource.VarID) // 印字のための情報セット
+			table.EnterTvar(token.U.ID, fptex)   // 変数名をテーブルに、番地は table が決める
 			token = getsource.NextToken(scanner, fptex)
 		} else {
 			getsource.ErrorMissingID(fptex)
@@ -118,16 +118,18 @@ func varDecl(scanner *bufio.Scanner, fptex *os.File) {
 // 関数宣言のコンパイル
 func funcDecl(scanner *bufio.Scanner, fptex *os.File) {
 	if token.Kind == getsource.Id {
+		//fmt.Println("funcDeclprev", token.Kind, token.U.ID, token.U.Value)
 		getsource.SetIdKind(getsource.FuncID) // 印字のための情報セット
 		// 関数名をテーブルに登録
 		// その先頭番地は次のコードの番地 NextCode()
-		fIndex := table.EnterTfunc(token.U.ID[:], codegen.NextCode(), fptex)
+		fIndex := table.EnterTfunc(token.U.ID, codegen.NextCode(), fptex)
 		token = getsource.CheckGet(getsource.NextToken(scanner, fptex), getsource.Lparen, scanner, fptex)
 		table.BlockBegin(FIRSTADDR, fptex) // パラメタ名のレベルは関数のブロックと同じ
 		for {
+			//fmt.Println("funcDeclfor", token.Kind, token.U.ID, token.U.Value)
 			if token.Kind == getsource.Id { // パラメタ名がある場合
-				getsource.SetIdKind(getsource.ParID)  // 印字のための情報セット
-				table.EnterTpar(token.U.ID[:], fptex) // パラメタ名をテーブルに登録
+				getsource.SetIdKind(getsource.ParID) // 印字のための情報セット
+				table.EnterTpar(token.U.ID, fptex)   // パラメタ名をテーブルに登録
 				token = getsource.NextToken(scanner, fptex)
 			} else {
 				break
@@ -163,7 +165,7 @@ func statement(scanner *bufio.Scanner, fptex *os.File) {
 	for {
 		switch token.Kind {
 		case getsource.Id: // 代入文のコンパイル
-			tIndex = table.SearchT(token.U.ID[:], getsource.VarID, fptex)
+			tIndex = table.SearchT(token.U.ID, getsource.VarID, fptex)
 			k = table.RetKindT(tIndex)
 			getsource.SetIdKind(k)                                // 印字のための情報セット
 			if (k != getsource.VarID) && (k != getsource.ParID) { // 変数名かパラメタ名のはず
@@ -219,7 +221,12 @@ func statement(scanner *bufio.Scanner, fptex *os.File) {
 			return
 		case getsource.Write: // write 文のコンパイル
 			token = getsource.NextToken(scanner, fptex)
-			codegen.GenCodeO(codegen.Wrl, fptex) // 改行を出力する wrl 命令
+			expression(scanner, fptex)
+			codegen.GenCodeO(codegen.Wrt, fptex) // 改行を出力する wrl 命令
+			return
+		case getsource.WriteLn:
+			token = getsource.NextToken(scanner, fptex)
+			codegen.GenCodeO(codegen.Wrl, fptex)
 			return
 		case getsource.End: // 空文を読んだことにして終わり
 			return
@@ -299,8 +306,9 @@ func factor(scanner *bufio.Scanner, fptex *os.File) {
 	var tIndex, i int
 	var k getsource.KindT
 	if token.Kind == getsource.Id {
-		tIndex = table.SearchT(token.U.ID[:], getsource.VarID, fptex)
+		tIndex = table.SearchT(token.U.ID, getsource.VarID, fptex)
 		k = table.RetKindT(tIndex)
+		//fmt.Println("FACTOR", token.U.ID, tIndex, k)
 		getsource.SetIdKind(table.RetKindT(tIndex)) // 印字のための情報セット
 		switch k {
 		case getsource.VarID:
@@ -388,21 +396,21 @@ func condition(scanner *bufio.Scanner, fptex *os.File) {
 			getsource.ErrorType("rel-op", fptex)
 			break
 		}
-	}
-	token = getsource.NextToken(scanner, fptex)
-	expression(scanner, fptex)
-	switch k {
-	case getsource.Equal:
-		codegen.GenCodeO(codegen.Eq, fptex)
-	case getsource.Lss:
-		codegen.GenCodeO(codegen.Ls, fptex)
-	case getsource.Gtr:
-		codegen.GenCodeO(codegen.Gr, fptex)
-	case getsource.NotEq:
-		codegen.GenCodeO(codegen.Neq, fptex)
-	case getsource.LssEq:
-		codegen.GenCodeO(codegen.Lseq, fptex)
-	case getsource.GtrEq:
-		codegen.GenCodeO(codegen.Greq, fptex)
+		token = getsource.NextToken(scanner, fptex)
+		expression(scanner, fptex)
+		switch k {
+		case getsource.Equal:
+			codegen.GenCodeO(codegen.Eq, fptex)
+		case getsource.Lss:
+			codegen.GenCodeO(codegen.Ls, fptex)
+		case getsource.Gtr:
+			codegen.GenCodeO(codegen.Gr, fptex)
+		case getsource.NotEq:
+			codegen.GenCodeO(codegen.Neq, fptex)
+		case getsource.LssEq:
+			codegen.GenCodeO(codegen.Lseq, fptex)
+		case getsource.GtrEq:
+			codegen.GenCodeO(codegen.Greq, fptex)
+		}
 	}
 }
