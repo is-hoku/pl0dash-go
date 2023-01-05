@@ -118,7 +118,6 @@ func varDecl(scanner *bufio.Scanner, fptex *os.File) {
 // 関数宣言のコンパイル
 func funcDecl(scanner *bufio.Scanner, fptex *os.File) {
 	if token.Kind == getsource.Id {
-		//fmt.Println("funcDeclprev", token.Kind, token.U.ID, token.U.Value)
 		getsource.SetIdKind(getsource.FuncID) // 印字のための情報セット
 		// 関数名をテーブルに登録
 		// その先頭番地は次のコードの番地 NextCode()
@@ -126,7 +125,6 @@ func funcDecl(scanner *bufio.Scanner, fptex *os.File) {
 		token = getsource.CheckGet(getsource.NextToken(scanner, fptex), getsource.Lparen, scanner, fptex)
 		table.BlockBegin(FIRSTADDR, fptex) // パラメタ名のレベルは関数のブロックと同じ
 		for {
-			//fmt.Println("funcDeclfor", token.Kind, token.U.ID, token.U.Value)
 			if token.Kind == getsource.Id { // パラメタ名がある場合
 				getsource.SetIdKind(getsource.ParID) // 印字のための情報セット
 				table.EnterTpar(token.U.ID, fptex)   // パラメタ名をテーブルに登録
@@ -308,7 +306,6 @@ func factor(scanner *bufio.Scanner, fptex *os.File) {
 	if token.Kind == getsource.Id {
 		tIndex = table.SearchT(token.U.ID, getsource.VarID, fptex)
 		k = table.RetKindT(tIndex)
-		//fmt.Println("FACTOR", token.U.ID, tIndex, k)
 		getsource.SetIdKind(table.RetKindT(tIndex)) // 印字のための情報セット
 		switch k {
 		case getsource.VarID:

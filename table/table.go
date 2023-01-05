@@ -18,13 +18,6 @@ var tfIndex int                          // 名前表の関数を保持してい
 var localAddr int                        // 現在のブロックの最後の変数の番地
 // 引数付き関数は引数、関数、関数内の変数の順番で実行時にスタックされるため、ブロックのデータ領域には退避領域、 RetAdr, a, b, c の順でスタックされることを考慮すると top (スタックの最後尾)  が指すところから 2 番地目から変数がある
 
-//const (
-//	VarID getsource.KindT = iota
-//	FuncID
-//	ParID
-//	ConstID
-//)
-
 // ブロックの始まり (最初の変数の番地) で呼ばれる
 func BlockBegin(firstAddr int, fptex *os.File) {
 	if level == -1 { // 主ブロックの初期設定
@@ -85,7 +78,6 @@ func EnterTfunc(id string, v int, fptex *os.File) int {
 	nameTable[tIndex].U.F.Raddr.Addr = v // 関数の先頭番地 (目的コード)
 	nameTable[tIndex].U.F.Pars = 0       // パラメタ数の初期値
 	tfIndex = tIndex                     // 関数名のインデックスを一時保持
-	//fmt.Println("nameTable", tIndex, nameTable[tIndex].Kind, nameTable[tIndex-1].Name, nameTable[tIndex].U.F.Raddr.Level, nameTable[tIndex].U.F.Raddr.Addr)
 	return tIndex
 }
 
@@ -95,7 +87,6 @@ func EnterTpar(id string, fptex *os.File) int {
 	nameTable[tIndex].Kind = getsource.ParID
 	nameTable[tIndex].U.Raddr.Level = level
 	nameTable[tfIndex].U.F.Pars++ // 関数のパラメタ数のカウント
-	//fmt.Println("nameTable", tIndex, nameTable[tIndex].Kind, nameTable[tIndex-1].Name, nameTable[tIndex].U.F.Raddr.Level, nameTable[tfIndex].U.F.Pars)
 	return tIndex
 }
 

@@ -409,7 +409,6 @@ func nextChar(scanner *bufio.Scanner, fptex *os.File) byte {
 	if lineIndex == -1 {
 		if (scanner.Scan()) && (len(scanner.Text()) <= 120) {
 			line = scanner.Text()
-			//fmt.Println("line", line)
 			lineIndex = 0
 		} else {
 			ErrorF("end of file\n", fptex)
@@ -419,11 +418,7 @@ func nextChar(scanner *bufio.Scanner, fptex *os.File) byte {
 		lineIndex = -1
 		return '\n'
 	}
-	//fmt.Println("index:", lineIndex)
-	//fmt.Println(line[lineIndex])
-	//fmt.Println("CHAR:", ch)
 	ch = line[lineIndex]
-	//fmt.Println("cahr", ch)
 	lineIndex++
 	return ch
 }
@@ -535,7 +530,6 @@ func NextToken(scanner *bufio.Scanner, fptex *os.File) Token {
 
 	cToken = temp
 	printed = false
-	//fmt.Println("token", temp)
 	return temp
 }
 

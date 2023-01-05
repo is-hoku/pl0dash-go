@@ -127,9 +127,6 @@ func GenCodeV(op OpCode, v int, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = op
 	code[cIndex].u.value = v
-	//fmt.Println("level", table.BLevel())
-	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.value)
-	//fmt.Println("")
 	return cIndex
 }
 
@@ -138,9 +135,6 @@ func GenCodeT(op OpCode, ti int, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = op
 	code[cIndex].u.addr = table.RetRelAddr(ti)
-	//fmt.Println("level", table.BLevel())
-	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.addr)
-	//fmt.Println("")
 	return cIndex
 }
 
@@ -149,9 +143,6 @@ func GenCodeO(p Operator, fptex *os.File) int {
 	checkMax(fptex)
 	code[cIndex].opCode = Opr
 	code[cIndex].u.optr = p
-	//fmt.Println("level", table.BLevel())
-	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.optr)
-	//fmt.Println("")
 	return cIndex
 }
 
@@ -164,10 +155,6 @@ func GenCodeR(fptex *os.File) int {
 	code[cIndex].opCode = Ret
 	code[cIndex].u.addr.Level = table.BLevel()
 	code[cIndex].u.addr.Addr = table.FPars() // パラメタ数 (実行スタックの解放用)
-	//fmt.Println("level", table.BLevel())
-	//fmt.Println(cIndex, ":", code[cIndex].opCode, code[cIndex].u.addr.Level, code[cIndex].u.addr.Addr)
-
-	//fmt.Println("")
 	return cIndex
 }
 
@@ -199,12 +186,6 @@ func Execute(fptex *os.File) {
 	display[0] = 0 // 主ブロックの先頭番地は 0
 	for {
 		i = code[pc] // これから実行する命令語
-		//fmt.Println("PC:", pc)
-		//fmt.Println("code:", i.opCode, i.u.addr, i.u.optr, i.u.value)
-		//fmt.Println("stack:", stack[:30])
-		//fmt.Println("display:", display)
-		//fmt.Println("top:", top)
-		//fmt.Println("")
 		pc++
 		switch i.opCode {
 		case Lit:
